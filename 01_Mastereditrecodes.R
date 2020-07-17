@@ -86,7 +86,7 @@ df$covidneg <- as.numeric(df$eid %in% negtest$eid)
 
 
 ####
-results <- list()
+#Generate result tuples of log odds estimates with SEs
 
 nwhitepos <- summary(glm(covidpos ~ nwhite, df, family="binomial"))$coefficients[2,1:2]
 
