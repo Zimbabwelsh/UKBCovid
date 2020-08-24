@@ -3,7 +3,7 @@ library(dplyr)
 library(parallel)
 
 # read in covid testing
-covid <- fread("data/covid_19/covid19_result_2020_05_26.txt", he=T)
+covid <- fread("data/covid_19/covid19_result_2020_07_31.txt", he=T)
 
 #create phenotypes of positive and negative test
 covid <- covid %>% group_by(eid) %>% mutate(postests=mean(result))
@@ -13,6 +13,46 @@ postest <- setDT(unique(covid %>% select('eid','testspos')),keep.rownames=TRUE, 
 postest <- postest[testspos==1]
 negtest <- setDT(unique(covid %>% select('eid','testsneg')),keep.rownames=TRUE, key=NULL, check.names=FALSE)
 negtest <- negtest[testsneg==1]
+
+
+#Indicate source location for phenotypes from PHESANT
+#Need a way to string together predictors across PHESANT .txt files
+#OR need to manipulate all PHESANT output so each file is a single predictor. 
+#Then can use Gib's code directly for a$discovery, assuming each column is titled $discovery
+
+# NEED to make sure that the non-testing regions are omitted, generate list of EIDs from non-England,
+
+df <- df[england==1]
+df <- df[deceased==0]
+
+# Also remove deceased and withdrawn consent (think maybe done already?)
+# Or run Louise's PHESANT package directly from command line? Need to pre-process to omit results from outside England 
+# and withdrawn/deceased participants
+
+phenpath <- "data/derived/phesant_mod"
+phens <- list.files(phenpath)
+
+
+phenout <- mclapply(phens, function(x)
+  {
+  message(x)
+  fn <- file.path(phenpath, x, "phen.txt")
+  file.exists(fn)
+  a <- fread(fn)
+  a <- merge(negtest, a, by.x="eid", by.y="FID")
+  form <- paste0("negtest~discovery")
+  return(try(summary(glm(form, a, family="binomial"))$coefficients))
+}, mc.cores=6)
+
+#
+
+
+# Remove non-testing regions
+
+
+# Generate case definitions
+df$covidpos <- as.numeric(df$eid %in% postest$eid)
+df$covidneg <- as.numeric(df$eid %in% negtest$eid)
 
 #read in UKB data
 df <- fread("data/data.33352.csv", select=c('eid', '31-0.0', '34-0.0', '54-0.0', '93-0.0', '94-0.0', '189-0.0',
@@ -56,7 +96,7 @@ df <- df %>% mutate(highbp = case_when((autsysbp<140 & autdiabp<90) ~ 0,
                                        bmi<=30 ~2),
                     
                     nwhite= case_when(ethnic==1001 | ethnic==1002 | ethnic == 1003 | ethnic==1 ~0,
-                                     (TRUE~1)),
+                                      (TRUE~1)),
                     
                     deceased= case_when(Deathage0==TRUE~1, 
                                         is.na(Deathage0)~0,
@@ -86,23 +126,23 @@ df$covidneg <- as.numeric(df$eid %in% negtest$eid)
 
 
 ####
-#Generate result tuples of log odds estimates with SEs
+
 
 nwhitepos <- summary(glm(covidpos ~ nwhite, df, family="binomial"))$coefficients[2,1:2]
 
 nwhiteneg <- summary(glm(covidneg ~ nwhite, df, family="binomial"))$coefficients[2,1:2]
 
-smokepos <- summary(lm(covidpos ~ smoking, df))$coefficients[2,1:2]
+smokepos <- summary(glm(covidpos ~ smoking, df, family="binomial"))$coefficients[2,1:2]
 
-smokeneg <- summary(lm(covidneg ~ smoking, df))$coefficients[2,1:2]
+smokeneg <- summary(glm(covidneg ~ smoking, df, family="binomial"))$coefficients[2,1:2]
 
-townspos <- summary(lm(covidpos ~ towns, df))$coefficients[2,1:2]
+townspos <- summary(glm(covidpos ~ towns, df, family = "binomial"))$coefficients[2,1:2]
 
-townsneg <- summary(lm(covidneg ~ towns, df))$coefficients[2,1:2]
+townsneg <- summary(glm(covidneg ~ towns, df, family = "binomial"))$coefficients[2,1:2]
 
-obespos <- summary(lm(covidpos ~ obesity, df))$coefficients[2,1:2]
-  
-obesneg <- summary(lm(covidneg ~ obesity, df))$coefficients[2,1:2]
+obespos <- summary(glm(covidpos ~ obesity, df, family = "binomial"))$coefficients[2,1:2]
+
+obesneg <- summary(glm(covidneg ~ obesity, df, family = "binomial"))$coefficients[2,1:2]
 
 data <- rbind(nwhitepos, nwhiteneg, smokepos, smokeneg, townspos, townsneg, obespos, obesneg)
 data <- as.data.frame(data)
@@ -111,7 +151,7 @@ data$LoCI <- exp(data[,1])-(1.96*(data[,2]))
 data$HiCI <- exp(data[,1])+(1.96*(data[,2]))
 
 write.csv(data,"posneg.csv", row.names = TRUE)
-                                      
+
 
 ###
 # Attempt to write function returning model ests for pos and neg tests
