@@ -21,27 +21,28 @@ source('testBinary.r')
 confounders = read.table(opt$confounderfile, sep=',', header=1)
 
 ## load trait of interest
-exposure = read.table(opt$traitofinterestfile, sep=',', header=1)
+outcome = read.table(opt$traitofinterestfile, sep=',', header=1)
 
 # move logfile and results creation to testBinary.r
 
+
+exposureTypes <- c("binary", "catunord", "catord", "cont")
+
+for (type in exposureTypes){
 ## create logFile
-# resLogFile = paste(opt$resDir, "results-log-", opt$partIdx, "-", opt$numParts, ".txt",sep="")
-# sink(resLogFile)
-# sink()
+resLogFile = paste(opt$resDir, "results-log-", type, "-", opt$partIdx, "-", opt$numParts, ".txt",sep="")
+sink(resLogFile)
+sink()
 
+## create empty results files
 
-## create empty results file
-
-# write("varName,varType,n,beta,lower,upper,pvalue", file=paste(opt$resDir,"results-logistic-binary-", opt$partIdx, "-", opt$numParts, ".txt",sep=""), append=FALSE)
+write("varName,varType,n,beta,lower,upper,pvalue", file=paste(opt$resDir,"results-logistic-", type, "-", opt$partIdx, "-", opt$numParts, ".txt",sep=""), append=FALSE)
 
 ## test each type of outcome
+}
 
-testBinary(opt$resDir, opt$partIdx, opt$numParts, confounders, exposure, opt$traitofinterest, opt$userId, opt$phenoDir, "cont")
-testBinary(opt$resDir, opt$partIdx, opt$numParts, confounders, exposure, opt$traitofinterest, opt$userId, opt$phenoDir, "catunord")
-testBinary(opt$resDir, opt$partIdx, opt$numParts, confounders, exposure, opt$traitofinterest, opt$userId, opt$phenoDir, "catord")
-testBinary(opt$resDir, opt$partIdx, opt$numParts, confounders, exposure, opt$traitofinterest, opt$userId, opt$phenoDir, "binary")
-
-
+for (type in exposureTypes){
+testBinary(opt$resDir, opt$partIdx, opt$numParts, confounders, outcome, opt$traitofinterest, opt$userId, opt$phenoDir, type)
+}
 
 
